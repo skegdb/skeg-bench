@@ -24,6 +24,27 @@ recall but none would match skeg on RAM *and* recall together).
 skeg is the only engine that is simultaneously leanest, most accurate, and fast.
 See `charts/chart_pareto.png`.
 
+### Standard dataset — GloVe-100-angular @ 500K
+
+`SKEG_CORPUS=data/glove_corpus.npy ... runner.py engines` — the canonical cosine
+ann-benchmarks dataset (1.18M × 100-dim word vectors; skeg ranks by normalized
+squared-L2, equivalent to cosine, so GloVe-angular is the right metric fit, not
+the L2-native SIFT/GIST). A genuinely hard distribution — recall drops for
+everyone — but skeg still leads on **both** recall and RAM, beating even
+full-precision Qdrant (its on-disk f32 re-rank recovers what quantization loses):
+
+| engine | serve RAM | recall@10 | recall@100 | p50 ms |
+| --- | ---: | ---: | ---: | ---: |
+| **skeg-tq2** | **31 MB** | **0.975** | **0.966** | 2.3 |
+| lancedb (IVF-PQ) | 946 MB | 0.909 | 0.729 | 14.4 |
+| qdrant-f32 | 611 MB | 0.899 | 0.823 | 2.0 |
+| hnswlib (raw HNSW) | 344 MB | 0.838 | 0.709 | 0.5 |
+| chroma (HNSW) | 616 MB | 0.818 | 0.696 | 2.6 |
+| milvus-lite | 118 MB | 0.776 | 0.729 | 1.4 |
+
+(HNSW engines at default `ef`; raising it trades latency for recall but not the
+RAM gap. GloVe fetched by `quickstart.sh` / the snippet in `data/README.md`.)
+
 ## Single-tenant scaling (mxbai-1024, skeg tiers vs Qdrant)
 
 `runner.py singletenant` — peak RAM during build / recall / latency at 100K–500K.
@@ -91,7 +112,7 @@ The authoritative kernel-enforced version: `docker/run-oom-demo.sh`.
 vector (its own nearest neighbour) while filtering for the victim, plus
 mid-stream deletes and consolidation.
 
-```
+```text
 8 tenants × 2000 vectors, 200 rounds, 604 tenant-scoped queries
 cross-tenant leaks: 0   ->   PASS
 ```

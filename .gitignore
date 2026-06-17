@@ -6,3 +6,5 @@ vendor/
 results/
 __pycache__/
 *.pyc
+data/*.hdf5
+data/*.h5

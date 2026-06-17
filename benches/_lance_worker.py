@@ -37,7 +37,8 @@ db = lancedb.connect(f"{work}/db")
 t0 = time.time()
 tbl = db.create_table("cmp", [{"id": i, "vector": corpus[i].tolist()} for i in range(n)])
 num_part = max(1, int(math.sqrt(n)))     # IVF: ~sqrt(n) partitions
-num_sub = max(1, dim // 8)               # PQ: dim/8 sub-vectors (~PQ-128 at 1024d)
+# PQ sub-vectors must DIVIDE the dimension: pick the largest divisor <= dim/8.
+num_sub = max(d for d in range(1, max(1, dim // 8) + 1) if dim % d == 0)
 tbl.create_index(metric="cosine", num_partitions=num_part, num_sub_vectors=num_sub, index_type="IVF_PQ")
 build_s = time.time() - t0
 disk_mib = sum(f.stat().st_size for f in Path(f"{work}/db").rglob("*") if f.is_file()) / (1024 * 1024)

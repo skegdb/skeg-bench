@@ -22,6 +22,25 @@ Keep the last few hundred rows aside as the query set. Larger is better for the
 density story — 500k single-tenant and 5×100k multi-tenant are the headline
 points; 1M mono-tenant is the stress point.
 
+## Standard dataset: GloVe-100-angular
+
+The canonical cosine ann-benchmarks set (1.18M × 100-dim). skeg ranks by
+normalized squared-L2 (≡ cosine), so use an angular dataset, not L2-native
+SIFT/GIST. Fetch once into `data/`:
+
+```python
+import urllib.request, h5py, numpy as np
+req = urllib.request.Request("https://ann-benchmarks.com/glove-100-angular.hdf5",
+                             headers={"User-Agent": "Mozilla/5.0"})
+open("data/glove-100-angular.hdf5", "wb").write(urllib.request.urlopen(req).read())
+f = h5py.File("data/glove-100-angular.hdf5")
+np.save("data/glove_corpus.npy", np.asarray(f["train"], dtype="<f4"))
+np.save("data/glove_queries.npy", np.asarray(f["test"], dtype="<f4")[:200])
+```
+
+Then `SKEG_CORPUS=data/glove_corpus.npy SKEG_QUERIES=data/glove_queries.npy
+N=500000 python runner.py engines`.
+
 ## Qdrant binary
 
 Place a Qdrant server binary at `vendor/qdrant` (downloaded from
