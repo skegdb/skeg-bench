@@ -24,9 +24,10 @@ PHASES = {
     "container": ("benches/container_oom.py", {}),
     "isolation": ("benches/isolation_fuzz.py", {}),  # generates its own data
     "latency": ("benches/noisy_neighbor.py", {}),    # synthetic; latency idle + under load
+    "engines": ("benches/multi_engine.py", {}),      # skeg vs lancedb vs qdrant
 }
-# phases that need a corpus/query set (isolation makes its own random data)
-NEEDS_CORPUS = {"singletenant", "multitenant", "filter", "container"}
+# phases that need a corpus/query set (isolation/latency make their own data)
+NEEDS_CORPUS = {"singletenant", "multitenant", "filter", "container", "engines"}
 PLOTS = ["plot_singletenant.py", "plot_multitenant.py", "plot_shared_filter.py", "plot_latency.py"]
 
 
