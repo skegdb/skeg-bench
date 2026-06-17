@@ -22,6 +22,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import redis
+from _common import free_port, wait_tcp
 
 
 def _client_load(args):
@@ -41,20 +42,6 @@ M = int(os.environ.get("M", "50000"))
 DIM = int(os.environ.get("DIM", "256"))
 SECS = float(os.environ.get("SECS", "3"))
 CONC = [int(x) for x in os.environ.get("CONC", "1,2,4,8,16,32").split(",")]
-
-
-def free_port():
-    s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
-
-
-def wait_tcp(port, t=30):
-    end = time.time() + t
-    while time.time() < end:
-        try:
-            socket.create_connection(("127.0.0.1", port), 0.2).close(); return True
-        except OSError:
-            time.sleep(0.05)
-    return False
 
 
 def peak_qps(port):

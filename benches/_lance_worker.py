@@ -18,13 +18,10 @@ from pathlib import Path
 
 import numpy as np
 
-
-def rss_mib():
-    return int(subprocess.run(["ps", "-o", "rss=", "-p", str(os.getpid())],
-                              capture_output=True, text=True).stdout.strip()) / 1024.0
+from _common import rss
 
 
-baseline = rss_mib()  # python + numpy, before any data
+baseline = rss()  # python + numpy, before any data
 import lancedb  # noqa: E402
 
 cp, qp, work, nprobes = sys.argv[1], sys.argv[2], sys.argv[3], int(sys.argv[4])
@@ -68,7 +65,7 @@ for v in qlist:
 a = sorted(lat)
 pick = lambda p: a[min(len(a) - 1, int(len(a) * p))]
 print(json.dumps({
-    "rss_mib": round(rss_mib(), 1),
+    "rss_mib": round(rss(), 1),
     "baseline_mib": round(baseline, 1),
     "build_s": round(build_s, 2),
     "disk_mib": round(disk_mib, 1),

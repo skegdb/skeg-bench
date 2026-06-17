@@ -24,6 +24,7 @@ import tempfile
 import time
 
 import numpy as np
+from _common import free_port, wait_tcp, rss, load_npy
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKEG = os.environ["SKEG_RESP3_BIN"]
@@ -34,41 +35,6 @@ NS = int(os.environ.get("NS", "5"))
 M = int(os.environ.get("M", "100000"))
 TIER = os.environ.get("SKEG_TIER", "tq2")
 QPT = 10
-
-
-def load_npy(path, limit):
-    with open(path, "rb") as f:
-        assert f.read(6) == b"\x93NUMPY"
-        f.read(2)
-        hlen = int.from_bytes(f.read(2), "little")
-        hdr = f.read(hlen).decode()
-        cols = int(hdr.split("'shape':")[1].split(",")[1].split(")")[0])
-        data = np.frombuffer(f.read(limit * cols * 4), dtype="<f4")
-    return data.reshape(limit, cols).copy()
-
-
-def free_port():
-    s = socket.socket()
-    s.bind(("127.0.0.1", 0))
-    p = s.getsockname()[1]
-    s.close()
-    return p
-
-
-def wait_tcp(port, t=60):
-    end = time.time() + t
-    while time.time() < end:
-        try:
-            socket.create_connection(("127.0.0.1", port), 0.2).close()
-            return True
-        except OSError:
-            time.sleep(0.1)
-    return False
-
-
-def rss_mib(pid):
-    o = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True)
-    return int(o.stdout.strip() or 0) / 1024
 
 
 def serve_skeg(corpus, queries):
@@ -91,16 +57,16 @@ def serve_skeg(corpus, queries):
                     a += [str(i), sl[i].tobytes(), ""]
                 r.execute_command(*a)
                 if (s // 256) % 20 == 0:
-                    peak = max(peak, rss_mib(p.pid))
+                    peak = max(peak, rss(p.pid))
             r.execute_command("SKEG.VINDEX.CONSOLIDATE", f"idx{t}")
-            peak = max(peak, rss_mib(p.pid))
+            peak = max(peak, rss(p.pid))
         # confirm it actually serves under the cap
         ok = True
         for t in range(NS):
             for qi in range(QPT):
                 res = r.execute_command("SKEG.VSEARCH", f"idx{t}", "10", "200", queries[qi].tobytes())
                 ok = ok and len(res) > 0
-        serve = max(rss_mib(p.pid) for _ in range(5))
+        serve = max(rss(p.pid) for _ in range(5))
         return peak, serve, ok
     finally:
         p.terminate()
@@ -130,17 +96,17 @@ def serve_qdrant(corpus, queries):
                 cl.upsert(f"t{t}", points=[models.PointStruct(id=s + j, vector=sl[s + j].tolist())
                                            for j in range(min(256, M - s))])
                 if (s // 256) % 20 == 0:
-                    peak = max(peak, rss_mib(p.pid))
+                    peak = max(peak, rss(p.pid))
         for t in range(NS):
             while not str(cl.get_collection(f"t{t}").status).lower().endswith("green"):
                 time.sleep(0.3)
-                peak = max(peak, rss_mib(p.pid))
+                peak = max(peak, rss(p.pid))
         ok = True
         for t in range(NS):
             for qi in range(QPT):
                 pts = cl.query_points(f"t{t}", query=queries[qi].tolist(), limit=10).points
                 ok = ok and len(pts) > 0
-        serve = max(rss_mib(p.pid) for _ in range(5))
+        serve = max(rss(p.pid) for _ in range(5))
         return peak, serve, ok
     finally:
         p.terminate()

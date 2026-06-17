@@ -21,6 +21,7 @@ import tempfile
 import time
 
 import numpy as np
+from _common import free_port, wait_tcp, rss, load_npy
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKEG = os.environ["SKEG_RESP3_BIN"]
@@ -33,36 +34,6 @@ TIER = os.environ.get("SKEG_TIER", "tq2")
 # straw-man. Lower these and lance gets faster but its recall collapses.
 NPROBES = int(os.environ.get("LANCE_NPROBES", "150"))
 REFINE = int(os.environ.get("LANCE_REFINE", "10"))
-
-
-def load_npy(path, limit):
-    with open(path, "rb") as f:
-        assert f.read(6) == b"\x93NUMPY"
-        f.read(2)
-        hlen = int.from_bytes(f.read(2), "little")
-        hdr = f.read(hlen).decode()
-        cols = int(hdr.split("'shape':")[1].split(",")[1].split(")")[0])
-        data = np.frombuffer(f.read(limit * cols * 4), dtype="<f4")
-    return data.reshape(limit, cols).copy()
-
-
-def free_port():
-    s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
-
-
-def wait_tcp(port, t=60):
-    end = time.time() + t
-    while time.time() < end:
-        try:
-            socket.create_connection(("127.0.0.1", port), 0.2).close(); return True
-        except OSError:
-            time.sleep(0.1)
-    return False
-
-
-def rss(pid):
-    o = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True)
-    return int(o.stdout.strip() or 0) / 1024
 
 
 def gt(corpus, queries, k=100):

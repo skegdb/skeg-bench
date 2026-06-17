@@ -25,6 +25,7 @@ import threading
 import time
 
 import numpy as np
+from _common import free_port, wait_tcp
 
 SKEG = os.environ["SKEG_RESP3_BIN"]
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -36,20 +37,6 @@ NOISE = int(os.environ.get("NOISE_THREADS", "8"))
 WORKERS = int(os.environ.get("WORKERS", "8"))
 NQ = int(os.environ.get("QUERIES", "200"))
 VICTIM, NOISY = 0, 1
-
-
-def free_port():
-    s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
-
-
-def wait_tcp(port, t=30):
-    end = time.time() + t
-    while time.time() < end:
-        try:
-            socket.create_connection(("127.0.0.1", port), 0.2).close(); return True
-        except OSError:
-            time.sleep(0.05)
-    return False
 
 
 def pcts(lat):

@@ -25,6 +25,7 @@ One engine at a time (clean RSS).
 """
 import os, time, socket, subprocess, tempfile, shutil
 import numpy as np
+from _common import free_port, wait_tcp, rss, load_npy
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKEG = os.environ["SKEG_RESP3_BIN"]
@@ -35,36 +36,8 @@ M = int(os.environ.get("M", "20000"))
 QPT = int(os.environ.get("QPT", "20"))
 
 
-def load_npy(path, limit):
-    with open(path, "rb") as f:
-        assert f.read(6) == b"\x93NUMPY"; f.read(2)
-        hlen = int.from_bytes(f.read(2), "little"); hdr = f.read(hlen).decode()
-        cols = int(hdr.split("'shape':")[1].split(",")[1].split(")")[0])
-        data = np.frombuffer(f.read(limit * cols * 4), dtype="<f4")
-    return data.reshape(limit, cols).copy()
-
-
-def free_port():
-    s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
-
-
-def wait_tcp(port, t=60):
-    end = time.time() + t
-    while time.time() < end:
-        try:
-            socket.create_connection(("127.0.0.1", port), 0.2).close(); return True
-        except OSError:
-            time.sleep(0.1)
-    return False
-
-
-def rss_mib(pid):
-    out = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True)
-    return int(out.stdout.strip() or 0) / 1024
-
-
 def steady(pid):
-    return max(rss_mib(pid) for _ in range(5))
+    return max(rss(pid) for _ in range(5))
 
 
 def gt_for(corpus, queries, t):
@@ -95,9 +68,9 @@ def run_skeg(corpus, queries, N, tier="int8"):
                 a = ["SKEG.VMSET", f"idx{t}"]
                 for i in range(s, min(s + B, M)): a += [str(i), sl[i].tobytes(), ""]
                 r.execute_command(*a)
-                if (s // B) % 20 == 0: peak = max(peak, rss_mib(p.pid))
+                if (s // B) % 20 == 0: peak = max(peak, rss(p.pid))
             r.execute_command("SKEG.VINDEX.CONSOLIDATE", f"idx{t}")
-            peak = max(peak, rss_mib(p.pid))
+            peak = max(peak, rss(p.pid))
         serve = steady(p.pid)
         recs, lat = [], []
         for t in range(N):
@@ -130,8 +103,8 @@ def run_skeg_shared_filter(corpus, queries, N, tier="int8"):
                 a = ["SKEG.VMSET", "shared"]
                 for i in range(s, min(s + B, M)): a += [str(t * M + i), sl[i].tobytes(), f"tenant={t}"]
                 r.execute_command(*a)
-                if (s // B) % 20 == 0: peak = max(peak, rss_mib(p.pid))
-        r.execute_command("SKEG.VINDEX.CONSOLIDATE", "shared"); peak = max(peak, rss_mib(p.pid))
+                if (s // B) % 20 == 0: peak = max(peak, rss(p.pid))
+        r.execute_command("SKEG.VINDEX.CONSOLIDATE", "shared"); peak = max(peak, rss(p.pid))
         serve = steady(p.pid)
         recs, lat, leak = [], [], 0
         for t in range(N):
@@ -169,10 +142,10 @@ def run_qdrant_coll(corpus, queries, N):
             for s in range(0, M, 256):
                 cl.upsert(f"t{t}", points=[models.PointStruct(id=s + j, vector=sl[s + j].tolist())
                                            for j in range(min(256, M - s))])
-                if (s // 256) % 20 == 0: peak = max(peak, rss_mib(p.pid))
+                if (s // 256) % 20 == 0: peak = max(peak, rss(p.pid))
         for t in range(N):
             while not str(cl.get_collection(f"t{t}").status).lower().endswith("green"):
-                time.sleep(0.3); peak = max(peak, rss_mib(p.pid))
+                time.sleep(0.3); peak = max(peak, rss(p.pid))
         serve = steady(p.pid)
         recs, lat = [], []
         for t in range(N):
@@ -197,9 +170,9 @@ def run_qdrant_shared(corpus, queries, N):
             for s in range(0, M, 256):
                 cl.upsert("shared", points=[models.PointStruct(id=t * M + s + j, vector=sl[s + j].tolist(),
                           payload={"tenant": t}) for j in range(min(256, M - s))])
-                if (s // 256) % 20 == 0: peak = max(peak, rss_mib(p.pid))
+                if (s // 256) % 20 == 0: peak = max(peak, rss(p.pid))
         while not str(cl.get_collection("shared").status).lower().endswith("green"):
-            time.sleep(0.3); peak = max(peak, rss_mib(p.pid))
+            time.sleep(0.3); peak = max(peak, rss(p.pid))
         serve = steady(p.pid)
         recs, lat, leak = [], [], 0
         for t in range(N):

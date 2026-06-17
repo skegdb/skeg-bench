@@ -26,6 +26,7 @@ import tempfile
 import time
 
 import numpy as np
+from _common import free_port, wait_tcp
 
 SKEG = os.environ["SKEG_RESP3_BIN"]
 NS = int(os.environ.get("NS", "8"))
@@ -33,20 +34,6 @@ M = int(os.environ.get("M", "2000"))
 ROUNDS = int(os.environ.get("ROUNDS", "200"))
 DIM = int(os.environ.get("DIM", "64"))
 BASE = 1_000_000  # global id = tenant * BASE + local; tenant = id // BASE
-
-
-def free_port():
-    s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
-
-
-def wait_tcp(port, t=30):
-    end = time.time() + t
-    while time.time() < end:
-        try:
-            socket.create_connection(("127.0.0.1", port), 0.2).close(); return True
-        except OSError:
-            time.sleep(0.05)
-    return False
 
 
 def ids_of(res):
