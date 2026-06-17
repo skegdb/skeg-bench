@@ -34,11 +34,23 @@ LINE = {
 }
 I = dict(build=0, peak=1, serve=2, r10=3, r100=4, p50=5, p95=6)
 
+# Prefer a fresh run's results/; fall back to the embedded reference numbers.
+try:
+    from _parse import parse_singletenant
+    _Ns, _d = parse_singletenant()
+    if _d:
+        _ord = ["build", "peak", "serve", "r10", "r100", "p50", "p95"]
+        N = _Ns
+        NLAB = [f"{n // 1000}k" if n >= 1000 else str(n) for n in _Ns]
+        D = {c: [tuple(_d[c][n][k] for k in _ord) for n in _Ns] for c in _d}
+except (FileNotFoundError, KeyError):
+    pass
+
 
 def lines(a, key, title, ylab, logy, ylim=None):
     for cfg in D:
-        col, ls, mk = LINE[cfg]
-        a.plot(N, [D[cfg][j][I[key]] for j in range(3)], ls, color=col, marker=mk,
+        col, ls, mk = LINE.get(cfg, ("#888", "-", "o"))
+        a.plot(N, [D[cfg][j][I[key]] for j in range(len(N))], ls, color=col, marker=mk,
                lw=2, ms=7, label=cfg)
     if logy:
         a.set_yscale("log")
@@ -61,11 +73,14 @@ lines(ax[0][1], "serve", "Steady serve RSS vs N — lower is better", "MB (log)"
 lines(ax[1][0], "r10",   "recall@10 vs N — higher is better", "recall@10", False, (0.93, 1.005))
 lines(ax[1][1], "r100",  "recall@100 vs N — higher is better", "recall@100", False, (0.93, 1.005))
 
-# RAM gap callouts (peak + serve) at N=500k
-ax[0][0].annotate("skeg 794  vs  qdrant 5436  → 6.8x", xy=(500_000, 5436), xytext=(165_000, 3300),
-                  fontsize=9, color="#c33", fontweight="bold", arrowprops=dict(arrowstyle="->", color="#c33"))
-ax[0][1].annotate("skeg ~100-200  vs  qdrant 2331-2563  → 12-25x", xy=(500_000, 2400), xytext=(150_000, 900),
-                  fontsize=9, color="#c33", fontweight="bold", arrowprops=dict(arrowstyle="->", color="#c33"))
+# RAM gap callout at the largest N, computed from whatever data is loaded.
+if len(N) >= 2 and "qdrant-f32" in D and "skeg-tq2" in D:
+    qd = D["qdrant-f32"][-1][I["peak"]]
+    sk = D["skeg-tq2"][-1][I["peak"]]
+    ax[0][0].annotate(f"skeg {sk:.0f}  vs  qdrant {qd:.0f}  -> {qd / sk:.1f}x",
+                      xy=(N[-1], qd), xytext=(N[len(N) // 3], qd * 0.65),
+                      fontsize=9, color="#c33", fontweight="bold",
+                      arrowprops=dict(arrowstyle="->", color="#c33"))
 
 fig.tight_layout(rect=[0, 0, 1, 0.96])
 import os
@@ -107,9 +122,9 @@ def ram_pair(a, ni, title):
 
 
 fig2, ax2 = plt.subplots(1, 1, figsize=(13, 7))
-fig2.suptitle("Phase A RAM @500k — peak vs serve RSS side by side, linear  (mxbai-1024)",
+fig2.suptitle(f"Phase A RAM @{NLAB[-1]} — peak vs serve RSS side by side, linear  (mxbai-1024)",
               fontsize=14, fontweight="bold")
-ram_pair(ax2, 2, "Peak vs serve RSS @500k (MB) per config — lower is better")
+ram_pair(ax2, len(N) - 1, f"Peak vs serve RSS @{NLAB[-1]} (MB) per config — lower is better")
 fig2.tight_layout(rect=[0, 0, 1, 0.95])
 out2 = "charts/chart_singletenant_ram.png"
 fig2.savefig(out2, dpi=130)

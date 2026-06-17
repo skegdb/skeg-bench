@@ -30,11 +30,22 @@ LINE = {
 }
 I = dict(peak=0, serve=1, recall=2, p50=3)
 
+# Prefer a fresh run's results/filter.txt; fall back to embedded reference.
+try:
+    from _parse import parse_filter
+    _Ts, _d = parse_filter()
+    if _d:
+        _ord = ["peak", "serve", "recall", "p50"]
+        T = _Ts
+        D = {c: [tuple(_d[c][t][k] for k in _ord) for t in _Ts] for c in _d}
+except (FileNotFoundError, KeyError):
+    pass
+
 
 def lines(a, key, title, ylab, logy, ylim=None):
     for cfg in D:
-        col, ls, mk = LINE[cfg]
-        a.plot(T, [D[cfg][j][I[key]] for j in range(2)], ls, color=col, marker=mk, lw=2, ms=8, label=cfg)
+        col, ls, mk = LINE.get(cfg, ("#888", "-", "o"))
+        a.plot(T, [D[cfg][j][I[key]] for j in range(len(T))], ls, color=col, marker=mk, lw=2, ms=8, label=cfg)
     if logy:
         a.set_yscale("log")
     if ylim:
@@ -58,15 +69,15 @@ lines(ax[1][0], "recall", "recall@10 vs #tenants — qdrant decays to 0.94 (high
 a = ax[1][1]
 cfgs = list(D.keys())
 x = np.arange(len(cfgs)); w = 0.4
-peak = [D[c][1][I["peak"]] for c in cfgs]
-serve = [D[c][1][I["serve"]] for c in cfgs]
+peak = [D[c][len(T) - 1][I["peak"]] for c in cfgs]
+serve = [D[c][len(T) - 1][I["serve"]] for c in cfgs]
 b1 = a.bar(x - w/2, peak, w, color="#4878b0", edgecolor="k", lw=0.4, label="peak (build)")
 b2 = a.bar(x + w/2, serve, w, color="#f0a04b", edgecolor="k", lw=0.4, label="serve (steady RSS)")
 for bars in (b1, b2):
     for b in bars:
         a.text(b.get_x() + b.get_width()/2, b.get_height(), f"{b.get_height():.0f}",
                ha="center", va="bottom", fontsize=8, rotation=90)
-a.set_title("RAM @5 tenants — peak vs serve RSS (lower is better)", fontsize=11, fontweight="bold")
+a.set_title(f"RAM @{T[-1]} tenants — peak vs serve RSS (lower is better)", fontsize=11, fontweight="bold")
 a.set_ylabel("MB"); a.set_ylim(top=max(peak)*1.18)
 a.set_xticks(x); a.set_xticklabels(cfgs, rotation=20, ha="right", fontsize=9)
 a.grid(True, alpha=0.3, axis="y"); a.legend(fontsize=8)

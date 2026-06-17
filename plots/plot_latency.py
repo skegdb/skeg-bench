@@ -38,9 +38,24 @@ STY = {
 }
 
 
+# Prefer fresh runs; fall back to embedded reference. A=single-tenant, B=multi.
+try:
+    from _parse import parse_singletenant, parse_multitenant
+    _na, _ad = parse_singletenant()
+    if _ad:
+        NA = _na
+        A = {c: [(_ad[c][n]["p50"], _ad[c][n]["p95"]) for n in _na] for c in _ad}
+    _tb, _bd = parse_multitenant()
+    if _bd:
+        TB = _tb
+        B = {c: [(_bd[c][t]["p50"], _bd[c][t]["p95"]) for t in _tb] for c in _bd}
+except (FileNotFoundError, KeyError):
+    pass
+
+
 def panel(a, data, xs, idx, title, xlab, xticklab):
     for cfg in data:
-        col, ls, mk = STY[cfg]
+        col, ls, mk = STY.get(cfg, ("#888", "-", "o"))
         a.plot(xs, [data[cfg][j][idx] for j in range(len(xs))], ls, color=col,
                marker=mk, lw=2, ms=7, label=cfg)
     a.set_title(title, fontsize=11, fontweight="bold")
@@ -53,10 +68,12 @@ fig, ax = plt.subplots(2, 2, figsize=(14, 10))
 fig.suptitle("Query latency across both phases — skeg tiers vs qdrant  (mxbai-1024; skeg RESP3 vs qdrant HTTP)",
              fontsize=13, fontweight="bold")
 
-panel(ax[0][0], A, NA, 0, "Phase A single-tenant — p50 vs N (lower is better)", "corpus size", ["100k", "200k", "500k"])
-panel(ax[0][1], A, NA, 1, "Phase A single-tenant — p95 vs N (lower is better)", "corpus size", ["100k", "200k", "500k"])
-panel(ax[1][0], B, TB, 0, "Phase B multi-tenant — p50 vs #tenants (lower is better)", "tenants", ["3", "5"])
-panel(ax[1][1], B, TB, 1, "Phase B multi-tenant — p95 vs #tenants (lower is better)", "tenants", ["3", "5"])
+_alab = [f"{n // 1000}k" if n >= 1000 else str(n) for n in NA]
+_blab = [str(t) for t in TB]
+panel(ax[0][0], A, NA, 0, "Phase A single-tenant — p50 vs N (lower is better)", "corpus size", _alab)
+panel(ax[0][1], A, NA, 1, "Phase A single-tenant — p95 vs N (lower is better)", "corpus size", _alab)
+panel(ax[1][0], B, TB, 0, "Phase B multi-tenant — p50 vs #tenants (lower is better)", "tenants", _blab)
+panel(ax[1][1], B, TB, 1, "Phase B multi-tenant — p95 vs #tenants (lower is better)", "tenants", _blab)
 
 fig.tight_layout(rect=[0, 0, 1, 0.96])
 import os

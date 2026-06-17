@@ -37,11 +37,22 @@ LINE = {
 }
 I = dict(peak=0, serve=1, recall=2, p50=3, p95=4)
 
+# Prefer a fresh run's results/; fall back to embedded reference numbers.
+try:
+    from _parse import parse_multitenant
+    _Ts, _d = parse_multitenant()
+    if _d:
+        _ord = ["peak", "serve", "recall", "p50", "p95"]
+        T = _Ts
+        D = {c: [tuple(_d[c][t][k] for k in _ord) for t in _Ts] for c in _d}
+except (FileNotFoundError, KeyError):
+    pass
+
 
 def lines(a, key, title, ylab, logy, ylim=None):
     for cfg in D:
-        col, ls, mk = LINE[cfg]
-        a.plot(T, [D[cfg][j][I[key]] for j in range(2)], ls, color=col, marker=mk,
+        col, ls, mk = LINE.get(cfg, ("#888", "-", "o"))
+        a.plot(T, [D[cfg][j][I[key]] for j in range(len(T))], ls, color=col, marker=mk,
                lw=2, ms=8, label=cfg)
     if logy:
         a.set_yscale("log")
@@ -60,7 +71,8 @@ fig.suptitle("Phase B multi-tenant density: skeg per-tenant isolation vs qdrant 
              fontsize=13, fontweight="bold")
 
 lines(ax[0][0], "peak", "Peak RAM vs #tenants — skeg flat, qdrant climbs (lower is better)", "MB (log)", True)
-ax[0][0].annotate("skeg ~flat\n(bounded by largest tenant)", xy=(5, 230), xytext=(3.25, 470),
+_sk_y = D.get("skeg-int8", D[list(D)[0]])[-1][I["peak"]]
+ax[0][0].annotate("skeg ~flat\n(bounded by largest tenant)", xy=(T[-1], _sk_y), xytext=(T[0] + (T[-1] - T[0]) * 0.15, _sk_y * 2.0),
                   fontsize=9, color="#085", fontweight="bold", arrowprops=dict(arrowstyle="->", color="#085"))
 lines(ax[0][1], "serve", "Steady serve RSS vs #tenants (lower is better)", "MB (log)", True)
 lines(ax[1][0], "recall", "recall@10 vs #tenants — skeg 1.0, qdrant lower (higher is better)", "recall@10", False, (0.94, 1.005))
@@ -69,8 +81,8 @@ lines(ax[1][0], "recall", "recall@10 vs #tenants — skeg 1.0, qdrant lower (hig
 a = ax[1][1]
 cfgs = list(D.keys())
 x = np.arange(len(cfgs)); w = 0.4
-peak = [D[c][1][I["peak"]] for c in cfgs]   # 5 tenants
-serve = [D[c][1][I["serve"]] for c in cfgs]
+peak = [D[c][len(T) - 1][I["peak"]] for c in cfgs]   # largest tenant count
+serve = [D[c][len(T) - 1][I["serve"]] for c in cfgs]
 b1 = a.bar(x - w/2, peak, w, color="#4878b0", edgecolor="k", lw=0.4, label="peak (build)")
 b2 = a.bar(x + w/2, serve, w, color="#f0a04b", edgecolor="k", lw=0.4, label="serve (steady RSS)")
 for bars in (b1, b2):
