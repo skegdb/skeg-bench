@@ -1,0 +1,8 @@
+# corpora and query sets are large; fetch/generate them locally (see data/README.md)
+data/*.npy
+# vendored qdrant binary
+vendor/
+# run outputs (charts/ holds committed reference figures only)
+results/
+__pycache__/
+*.pyc
