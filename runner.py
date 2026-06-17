@@ -28,7 +28,7 @@ PHASES = {
 }
 # phases that need a corpus/query set (isolation/latency make their own data)
 NEEDS_CORPUS = {"singletenant", "multitenant", "filter", "container", "engines"}
-PLOTS = ["plot_singletenant.py", "plot_multitenant.py", "plot_shared_filter.py", "plot_latency.py"]
+PLOTS = ["plot_singletenant.py", "plot_multitenant.py", "plot_shared_filter.py", "plot_latency.py", "plot_pareto.py"]
 
 
 def need(*vars):
