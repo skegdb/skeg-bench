@@ -23,6 +23,7 @@ PHASES = {
     "filter": ("benches/multitenant.py", {"MODE": "filter"}),
     "container": ("benches/container_oom.py", {}),
     "isolation": ("benches/isolation_fuzz.py", {}),  # generates its own data
+    "latency": ("benches/noisy_neighbor.py", {}),    # synthetic; latency idle + under load
 }
 # phases that need a corpus/query set (isolation makes its own random data)
 NEEDS_CORPUS = {"singletenant", "multitenant", "filter", "container"}
