@@ -22,7 +22,10 @@ PHASES = {
     "multitenant": ("benches/multitenant.py", {}),
     "filter": ("benches/multitenant.py", {"MODE": "filter"}),
     "container": ("benches/container_oom.py", {}),
+    "isolation": ("benches/isolation_fuzz.py", {}),  # generates its own data
 }
+# phases that need a corpus/query set (isolation makes its own random data)
+NEEDS_CORPUS = {"singletenant", "multitenant", "filter", "container"}
 PLOTS = ["plot_singletenant.py", "plot_multitenant.py", "plot_shared_filter.py", "plot_latency.py"]
 
 
@@ -34,7 +37,7 @@ def need(*vars):
 
 def run_phase(phase):
     script, extra = PHASES[phase]
-    need("SKEG_RESP3_BIN", "SKEG_CORPUS", "SKEG_QUERIES")
+    need("SKEG_RESP3_BIN", *(("SKEG_CORPUS", "SKEG_QUERIES") if phase in NEEDS_CORPUS else ()))
     os.makedirs(RESULTS, exist_ok=True)
     env = {**os.environ, "PYTHONUNBUFFERED": "1", **extra}
     out = os.path.join(RESULTS, f"{phase}.txt")
