@@ -25,6 +25,7 @@ PHASES = {
     "isolation": ("benches/isolation_fuzz.py", {}),  # generates its own data
     "latency": ("benches/noisy_neighbor.py", {}),    # synthetic; latency idle + under load
     "engines": ("benches/multi_engine.py", {}),      # skeg vs lancedb vs qdrant
+    "throughput": ("benches/throughput.py", {}),     # synthetic; QPS saturation, w=0 vs w=N
 }
 # phases that need a corpus/query set (isolation/latency make their own data)
 NEEDS_CORPUS = {"singletenant", "multitenant", "filter", "container", "engines"}

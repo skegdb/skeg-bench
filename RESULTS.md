@@ -130,6 +130,22 @@ hammered by 8 threads.
 skeg is ~2× lower latency idle and under load. (Both degrade by a similar factor
 under CPU saturation — this is a speed result, not an isolation claim.)
 
+## Throughput
+
+`runner.py throughput` — single-process QPS, GIL-free (client *processes*),
+inline vs the `--workers` pool. 50K × 256-dim, tq2.
+
+| | peak QPS (1 process) |
+| --- | ---: |
+| inline (`--workers 0`) | ~1,870 |
+| pool (`--workers 8`) | ~1,560 |
+
+Honest reading: QPS is noisy (±15%) and strongly dimension-dependent (heavier
+vectors → fewer QPS). The takeaways are directional: one process scales with
+concurrency to a per-process ceiling well above any single-shard folklore
+number, and the worker pool does not raise that ceiling here. For a real figure,
+measure at your own dimension/tier.
+
 ## What it costs
 
 `python tools/cost_calculator.py --vectors 50_000_000 --dim 1024 --tier tq2 --price 4`
