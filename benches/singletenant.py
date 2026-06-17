@@ -20,10 +20,10 @@ One engine at a time (clean RSS).
 import os, time, socket, subprocess, tempfile, shutil
 import numpy as np
 
-ROOT = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SKEG = os.environ["SKEG_RESP3_BIN"]
 QDRANT = os.path.join(ROOT, "vendor", "qdrant")
-DIM = 1024
+DIM = int(os.environ.get("DIM", "1024"))
 SCALES = [int(x) for x in os.environ.get("SCALES", "100000,200000,500000").split(",")]
 NQ = int(os.environ.get("NQ", "200"))
 
