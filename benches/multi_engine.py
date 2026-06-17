@@ -141,15 +141,17 @@ def run_qdrant(corpus, queries, truth):
         p.terminate(); p.wait(); shutil.rmtree(storage, ignore_errors=True)
 
 
-def run_lance(corpus, queries, truth):
-    work = tempfile.mkdtemp(prefix="me-lance-")
+def run_worker(corpus, queries, truth, worker, extra=()):
+    """Generic runner for embedded engines (lance/chroma/milvus/hnsw): each runs
+    in its own process and self-measures RSS over a python baseline."""
+    work = tempfile.mkdtemp(prefix="me-")
     cf, qf = os.path.join(work, "c.npy"), os.path.join(work, "q.npy")
     np.save(cf, corpus[:N]); np.save(qf, queries[:NQ])
     try:
-        out = subprocess.run(["python", os.path.join(os.path.dirname(__file__), "_lance_worker.py"),
-                              cf, qf, work, str(NPROBES), str(REFINE)], capture_output=True, text=True)
+        out = subprocess.run(["python", os.path.join(os.path.dirname(__file__), worker),
+                              cf, qf, work, *map(str, extra)], capture_output=True, text=True)
         if out.returncode != 0:
-            print("  lance worker failed:", out.stderr[-400:]); return None
+            print(f"  {worker} failed:", out.stderr.strip()[-300:]); return None
         j = json.loads(out.stdout.strip().splitlines()[-1])
         r10, r100 = recalls(j["got"], truth)
         return dict(build=j["build_s"], ram=j["rss_mib"] - j["baseline_mib"],
@@ -164,9 +166,17 @@ def main():
     truth = gt(corpus, queries)
     print(f"Cross-engine @ N={N} ({corpus.shape[1]}-dim), {NQ} queries, brute-force GT. RAM via ps -o rss.")
     print("(LanceDB RAM = marginal over python baseline; skeg/qdrant = server serve RSS.)\n")
-    rows = [("skeg-" + TIER, run_skeg(corpus, queries, truth)),
-            ("lancedb (IVF-PQ)", run_lance(corpus, queries, truth)),
-            ("qdrant-f32", run_qdrant(corpus, queries, truth))]
+    # Which engines to run (env ENGINES, comma-separated; default all available).
+    want = os.environ.get("ENGINES", "skeg,lancedb,chroma,milvus,hnswlib,qdrant").split(",")
+    candidates = {
+        "skeg": ("skeg-" + TIER, lambda: run_skeg(corpus, queries, truth)),
+        "lancedb": ("lancedb (IVF-PQ)", lambda: run_worker(corpus, queries, truth, "_lance_worker.py", [NPROBES, REFINE])),
+        "chroma": ("chroma (HNSW)", lambda: run_worker(corpus, queries, truth, "_chroma_worker.py")),
+        "milvus": ("milvus-lite", lambda: run_worker(corpus, queries, truth, "_milvus_worker.py")),
+        "hnswlib": ("hnswlib (raw HNSW)", lambda: run_worker(corpus, queries, truth, "_hnsw_worker.py")),
+        "qdrant": ("qdrant-f32", lambda: run_qdrant(corpus, queries, truth)),
+    }
+    rows = [(candidates[e][0], candidates[e][1]()) for e in want if e in candidates]
     print(f"  {'engine':<18} {'build_s':>7} {'serve RAM':>9} {'r@10':>6} {'r@100':>6} {'p50ms':>6} {'p95ms':>6}")
     for name, m in rows:
         if not m:
